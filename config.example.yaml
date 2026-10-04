@@ -1,0 +1,29 @@
+# HTTP address the gateway listens on.
+listen: ":8080"
+
+# Target VictoriaMetrics (vmsingle) instance.
+victoriametrics:
+  # Base URL. Events are pushed to <url>/api/v1/import/prometheus.
+  url: "http://127.0.0.1:8428"
+  # Timeout for each push request.
+  timeout: "5s"
+
+# Rate limits, in requests per minute. Exceeding a limit returns 429.
+ratelimit:
+  # Per-check limit, bucket "ping:<uuid>".
+  check_rpm: 10
+  # Per-source-IP limit, bucket "ip:<ip>" (IPv4 /32, IPv6 /128).
+  ip_rpm: 50
+
+# Registered healthchecks keyed by UUID. Only requests for a listed UUID
+# produce a metric; unknown UUIDs are answered with 200 "OK (not found)"
+# and logged, but nothing is pushed.
+checks:
+  f81d4fae-7dec-11d0-a765-00a0c91e6bf6:
+    labels:
+      service: "api"
+      env: "prod"
+  11111111-2222-3333-4444-555555555555:
+    labels:
+      service: "worker"
+      env: "staging"

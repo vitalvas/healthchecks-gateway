@@ -1,0 +1,15 @@
+[Unit]
+Description=healthchecks-gateway
+Documentation=https://github.com/vitalvas/healthchecks-gateway
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/healthchecks-gateway/config.yaml
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/healthchecks-gateway --config /etc/healthchecks-gateway/config.yaml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
