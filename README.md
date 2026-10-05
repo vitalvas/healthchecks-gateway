@@ -19,7 +19,7 @@ flowchart LR
 For every ping to a configured check, the gateway pushes one line in Prometheus
 exposition format:
 
-```
+```text
 healthcheck_event{check="<uuid>",event="<event>",<labels>} 1 <timestamp_ms>
 ```
 
@@ -47,7 +47,7 @@ Any endpoint accepts an optional `rid` query parameter carrying a
 client-generated UUID, used to pair a `start` ping with its completing
 `success`/`fail` ping:
 
-```
+```text
 /ping/{id}/start?rid=<uuid>
 /ping/{id}?rid=<uuid>
 ```
@@ -113,14 +113,14 @@ The gateway is configured with a single YAML file. See
 | `victoriametrics.timeout` | Timeout for each push request. | `5s` |
 | `ratelimit.check_rpm` | Per-check limit, requests per minute. | `10` |
 | `ratelimit.ip_rpm` | Per-source-IP limit, requests per minute. | `50` |
-| `checks.<uuid>.labels` | Static labels added to every event for the check. | - |
+| `checks.<uuid>.labels` | Static labels added to the check's events. | - |
 
 At least one check must be configured, and each check key must be a valid UUID.
 Both rate limits must be positive.
 
 ## Running
 
-```
+```sh
 healthchecks-gateway --config config.yaml
 ```
 
@@ -136,19 +136,19 @@ server down gracefully.
 With the check `f81d4fae-7dec-11d0-a765-00a0c91e6bf6` configured with labels
 `service=api` and `env=prod`, a successful ping:
 
-```
+```sh
 curl http://localhost:8080/ping/f81d4fae-7dec-11d0-a765-00a0c91e6bf6
 ```
 
 pushes:
 
-```
-healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",env="prod",event="success",service="api"} 1 1700000000000
+```text
+healthcheck_event{check="<uuid>",env="prod",event="success",service="api"} 1 <ts>
 ```
 
 A job reporting its shell exit status:
 
-```
+```sh
 curl http://localhost:8080/ping/f81d4fae-7dec-11d0-a765-00a0c91e6bf6/$?
 ```
 
