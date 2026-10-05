@@ -10,12 +10,6 @@ VictoriaMetrics for storage, alerting, and dashboards.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    client["Client (cron / script)"] -->|"GET/POST /ping/{id}"| gw["healthchecks-gateway"]
-    gw -->|"POST /api/v1/import/prometheus"| vm["VictoriaMetrics (vmsingle)"]
-```
-
 For every ping to a configured check, the gateway pushes one line in Prometheus
 exposition format:
 
