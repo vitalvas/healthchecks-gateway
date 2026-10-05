@@ -75,10 +75,11 @@ func (c *Client) Push(ctx context.Context, event Event) error {
 	return nil
 }
 
-// formatLine renders a single Prometheus exposition line with an explicit
-// millisecond timestamp:
+// formatLine renders a single Prometheus exposition line. The sample value is
+// the event time in Unix seconds and the sample timestamp is the same instant in
+// milliseconds:
 //
-//	healthcheck_event{check="...",event="...",<labels>} 1 <ts_ms>
+//	healthcheck_event{check="...",event="...",<labels>} <ts_sec> <ts_ms>
 func formatLine(event Event) string {
 	labels := make(map[string]string, len(event.Labels)+2)
 	maps.Copy(labels, event.Labels)
@@ -111,7 +112,9 @@ func formatLine(event Event) string {
 		b.WriteByte('"')
 	}
 
-	b.WriteString("} 1 ")
+	b.WriteString("} ")
+	b.WriteString(strconv.FormatInt(event.Timestamp.Unix(), 10))
+	b.WriteByte(' ')
 	b.WriteString(strconv.FormatInt(event.Timestamp.UnixMilli(), 10))
 
 	return b.String()

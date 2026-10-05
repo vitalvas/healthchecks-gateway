@@ -28,7 +28,7 @@ func TestFormatLine(t *testing.T) {
 				Event:     "success",
 				Timestamp: ts,
 			},
-			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="success"} 1 1700000000000`,
+			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="success"} 1700000000 1700000000000`,
 		},
 		{
 			name: "labels sorted alphabetically",
@@ -38,7 +38,7 @@ func TestFormatLine(t *testing.T) {
 				Labels:    map[string]string{"service": "api", "env": "prod"},
 				Timestamp: ts,
 			},
-			want: `healthcheck_event{check="id",env="prod",event="fail",service="api"} 1 1700000000000`,
+			want: `healthcheck_event{check="id",env="prod",event="fail",service="api"} 1700000000 1700000000000`,
 		},
 		{
 			name: "exit code added",
@@ -48,7 +48,7 @@ func TestFormatLine(t *testing.T) {
 				ExitCode:  new(37),
 				Timestamp: ts,
 			},
-			want: `healthcheck_event{check="id",event="fail",exit_code="37"} 1 1700000000000`,
+			want: `healthcheck_event{check="id",event="fail",exit_code="37"} 1700000000 1700000000000`,
 		},
 		{
 			name: "exit code zero",
@@ -58,7 +58,7 @@ func TestFormatLine(t *testing.T) {
 				ExitCode:  new(0),
 				Timestamp: ts,
 			},
-			want: `healthcheck_event{check="id",event="success",exit_code="0"} 1 1700000000000`,
+			want: `healthcheck_event{check="id",event="success",exit_code="0"} 1700000000 1700000000000`,
 		},
 		{
 			name: "label value escaping",
@@ -68,7 +68,7 @@ func TestFormatLine(t *testing.T) {
 				Labels:    map[string]string{"note": "a\\b\"c\nd"},
 				Timestamp: ts,
 			},
-			want: `healthcheck_event{check="id",event="success",note="a\\b\"c\nd"} 1 1700000000000`,
+			want: `healthcheck_event{check="id",event="success",note="a\\b\"c\nd"} 1700000000 1700000000000`,
 		},
 	}
 
@@ -104,7 +104,7 @@ func TestClientPush(t *testing.T) {
 
 		assert.Equal(t, importPath, gotPath)
 		assert.Equal(t, "text/plain", gotContentType)
-		assert.Equal(t, `healthcheck_event{check="id",event="success"} 1 1700000000000`, gotBody)
+		assert.Equal(t, `healthcheck_event{check="id",event="success"} 1700000000 1700000000000`, gotBody)
 	})
 
 	t.Run("trims trailing slash from base url", func(t *testing.T) {

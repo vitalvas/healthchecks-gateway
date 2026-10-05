@@ -71,22 +71,22 @@ func TestGatewayToVictoriaMetrics(t *testing.T) {
 		{
 			name: "success",
 			path: fmt.Sprintf("/ping/%s", checkID),
-			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="success",service="api"} 1`,
+			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="success",service="api"}`,
 		},
 		{
 			name: "fail",
 			path: fmt.Sprintf("/ping/%s/fail", checkID),
-			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="fail",service="api"} 1`,
+			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="fail",service="api"}`,
 		},
 		{
 			name: "exit code",
 			path: fmt.Sprintf("/ping/%s/2", checkID),
-			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="fail",exit_code="2",service="api"} 1`,
+			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="fail",exit_code="2",service="api"}`,
 		},
 		{
 			name: "start with run id",
 			path: fmt.Sprintf("/ping/%s/start?rid=11111111-2222-3333-4444-555555555555", checkID),
-			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="start",rid="11111111-2222-3333-4444-555555555555",service="api"} 1`,
+			want: `healthcheck_event{check="f81d4fae-7dec-11d0-a765-00a0c91e6bf6",event="start",rid="11111111-2222-3333-4444-555555555555",service="api"}`,
 		},
 	}
 

@@ -14,12 +14,12 @@ For every ping to a configured check, the gateway pushes one line in Prometheus
 exposition format:
 
 ```text
-healthcheck_event{check="<uuid>",event="<event>",<labels>} 1 <timestamp_ms>
+healthcheck_event{check="<uuid>",event="<event>",<labels>} <ts_seconds> <ts_ms>
 ```
 
 - The metric name is always `healthcheck_event`.
-- The sample value is always `1`.
-- The sample timestamp is the time the ping was received, in milliseconds.
+- The sample value is the ping time in Unix seconds.
+- The sample timestamp is the same instant in milliseconds.
 - `<labels>` are the static labels configured for the check.
 
 ## Endpoints
@@ -145,17 +145,17 @@ server down gracefully.
 
 ## Example
 
-With the check `f81d4fae-7dec-11d0-a765-00a0c91e6bf6` configured with labels
-`service=api` and `env=prod`, a successful ping:
+With a check configured with the labels `service=api` and `env=prod`, a
+successful ping:
 
 ```sh
 curl http://localhost:8080/ping/f81d4fae-7dec-11d0-a765-00a0c91e6bf6
 ```
 
-pushes:
+pushes (labels sorted, check UUID shortened to `<uuid>`):
 
 ```text
-healthcheck_event{check="<uuid>",env="prod",event="success",service="api"} 1 <ts>
+healthcheck_event{check="<uuid>",env="prod",event="success",service="api"} <s> <ms>
 ```
 
 A job reporting its shell exit status:
