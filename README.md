@@ -56,6 +56,23 @@ When present, `rid` must be a valid UUID and is added to the metric as a
 `rid="<uuid>"` label. This lets you compute a job's duration in VictoriaMetrics
 by matching the `start` and completion samples that share the same `rid`.
 
+### Named pings
+
+A check can accept named sub-pings under a slug segment, which adds a
+`name="<slug>"` label to the metric. The same suffixes apply:
+
+```text
+/ping/{id}/{name}
+/ping/{id}/{name}/fail
+/ping/{id}/{name}/start
+/ping/{id}/{name}/{0-255}
+```
+
+Named pings are controlled per check by the `names` setting (see Configuration):
+when `names` is omitted the named pings are rejected, when it is an empty list any
+name is allowed, and when it lists names only those are allowed. A disallowed name
+is answered with `200 OK (not found)` and logged.
+
 ### Request body
 
 A `POST` request may carry a body, but the gateway does not store it. The body
@@ -114,6 +131,7 @@ The gateway is configured with a single YAML file. See
 | `ratelimit.check_rpm` | Per-check limit, requests per minute. | `10` |
 | `ratelimit.ip_rpm` | Per-source-IP limit, requests per minute. | `50` |
 | `checks.<uuid>.labels` | Static labels added to the check's events. | - |
+| `checks.<uuid>.names` | Allowed named pings; omitted rejects, empty any. | - |
 
 At least one check must be configured, and each check key must be a valid UUID.
 Both rate limits must be positive.

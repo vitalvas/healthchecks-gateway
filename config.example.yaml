@@ -23,6 +23,12 @@ checks:
     labels:
       service: "api"
       env: "prod"
+    # Named pings add a name="<slug>" label under /ping/<uuid>/<name>.
+    # Omitted rejects named pings; an empty list allows any name; a list
+    # allows only the named slugs.
+    names:
+      - "backup"
+      - "sync"
   11111111-2222-3333-4444-555555555555:
     labels:
       service: "worker"

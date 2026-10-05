@@ -69,6 +69,24 @@ func newTestServerWithLimits(t *testing.T, pusher Pusher, pingRPM, ipRPM int) *S
 	return srv
 }
 
+func newTestServerWithCheck(t *testing.T, pusher Pusher, check config.Check) http.Handler {
+	t.Helper()
+
+	srv := New(Config{
+		Checks:    map[string]config.Check{knownID: check},
+		Pusher:    pusher,
+		Log:       discardLogger(),
+		RateLimit: config.RateLimitConfig{CheckRPM: highRPM, IPRPM: highRPM},
+	})
+	srv.now = func() time.Time { return time.UnixMilli(1700000000000) }
+	t.Cleanup(srv.Close)
+
+	h, err := srv.Handler()
+	require.NoError(t, err)
+
+	return h
+}
+
 func newTestServer(t *testing.T, pusher Pusher) *Server {
 	t.Helper()
 
@@ -204,26 +222,87 @@ func TestPushFailureStillReturnsOK(t *testing.T) {
 }
 
 func TestInvalidExitCode(t *testing.T) {
-	tests := []struct {
-		name string
-		path string
-		code int
-	}{
-		{name: "too large", path: pingURL(knownID, "256"), code: http.StatusBadRequest},
-		{name: "not a number", path: pingURL(knownID, "abc"), code: http.StatusNotFound},
-	}
+	pusher := &fakePusher{}
+	h := testHandler(t, pusher)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pusher := &fakePusher{}
-			h := testHandler(t, pusher)
+	rec := do(t, h, http.MethodGet, pingURL(knownID, "256"))
 
-			rec := do(t, h, http.MethodGet, tt.path)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Empty(t, pusher.events)
+}
 
-			assert.Equal(t, tt.code, rec.Code)
-			assert.Empty(t, pusher.events)
-		})
-	}
+func TestNamedPing(t *testing.T) {
+	t.Run("allowed name adds label across events", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			suffix       string
+			wantEvent    string
+			wantExitCode *int
+		}{
+			{name: "success", suffix: "backup", wantEvent: eventSuccess},
+			{name: "fail", suffix: "backup/fail", wantEvent: eventFail},
+			{name: "start", suffix: "backup/start", wantEvent: eventStart},
+			{name: "exit code", suffix: "backup/3", wantEvent: eventFail, wantExitCode: new(3)},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				pusher := &fakePusher{}
+				h := newTestServerWithCheck(t, pusher, config.Check{
+					Labels: map[string]string{"service": "api"},
+					Names:  &[]string{"backup"},
+				})
+
+				rec := do(t, h, http.MethodGet, pingURL(knownID, tt.suffix))
+
+				assert.Equal(t, http.StatusOK, rec.Code)
+				require.Len(t, pusher.events, 1)
+				got := pusher.events[0]
+				assert.Equal(t, tt.wantEvent, got.Event)
+				assert.Equal(t, map[string]string{"service": "api", "name": "backup"}, got.Labels)
+
+				if tt.wantExitCode == nil {
+					assert.Nil(t, got.ExitCode)
+				} else {
+					require.NotNil(t, got.ExitCode)
+					assert.Equal(t, *tt.wantExitCode, *got.ExitCode)
+				}
+			})
+		}
+	})
+
+	t.Run("empty names allows any name", func(t *testing.T) {
+		pusher := &fakePusher{}
+		h := newTestServerWithCheck(t, pusher, config.Check{Names: &[]string{}})
+
+		rec := do(t, h, http.MethodGet, pingURL(knownID, "anything"))
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		require.Len(t, pusher.events, 1)
+		assert.Equal(t, map[string]string{"name": "anything"}, pusher.events[0].Labels)
+	})
+
+	t.Run("nil names rejects named pings", func(t *testing.T) {
+		pusher := &fakePusher{}
+		h := newTestServerWithCheck(t, pusher, config.Check{Names: nil})
+
+		rec := do(t, h, http.MethodGet, pingURL(knownID, "backup"))
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, bodyNotFound, rec.Body.String())
+		assert.Empty(t, pusher.events)
+	})
+
+	t.Run("unlisted name rejected", func(t *testing.T) {
+		pusher := &fakePusher{}
+		h := newTestServerWithCheck(t, pusher, config.Check{Names: &[]string{"backup"}})
+
+		rec := do(t, h, http.MethodGet, pingURL(knownID, "other"))
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, bodyNotFound, rec.Body.String())
+		assert.Empty(t, pusher.events)
+	})
 }
 
 func TestInvalidUUID(t *testing.T) {

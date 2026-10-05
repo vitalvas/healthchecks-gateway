@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 	"uuid"
 
@@ -34,6 +35,26 @@ type RateLimitConfig struct {
 // Check describes a single registered healthcheck and its static labels.
 type Check struct {
 	Labels map[string]string `yaml:"labels"`
+
+	// Names controls slug-based named pings under /ping/<uuid>/<name>. When nil
+	// (the key is omitted), named pings are rejected. When an empty slice, any
+	// name is allowed. When populated, only the listed names are allowed.
+	Names *[]string `yaml:"names"`
+}
+
+// AllowsName reports whether a named ping with the given slug is allowed for the
+// check: rejected when Names is nil, allowed for any name when Names is empty,
+// and otherwise allowed only when the name is listed.
+func (c Check) AllowsName(name string) bool {
+	if c.Names == nil {
+		return false
+	}
+
+	if len(*c.Names) == 0 {
+		return true
+	}
+
+	return slices.Contains(*c.Names, name)
 }
 
 // Load reads the configuration from the given YAML file path, applies defaults,

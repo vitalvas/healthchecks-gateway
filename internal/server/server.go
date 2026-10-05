@@ -33,6 +33,9 @@ const (
 // ridLabel is the label added to the metric when a valid run id is provided.
 const ridLabel = "rid"
 
+// nameLabel is the label added to the metric for a slug-based named ping.
+const nameLabel = "name"
+
 const (
 	bodyOK       = "OK"
 	bodyNotFound = "OK (not found)"
@@ -127,10 +130,22 @@ func (s *Server) Handler() (http.Handler, error) {
 	r.Use(s.ipRateLimit)
 	r.Use(sizeLimit)
 
-	r.HandleFunc("/ping/{id:uuid}", s.handleSuccess).Methods(http.MethodGet, http.MethodPost, http.MethodHead)
-	r.HandleFunc("/ping/{id:uuid}/fail", s.handleFail).Methods(http.MethodGet, http.MethodPost, http.MethodHead)
-	r.HandleFunc("/ping/{id:uuid}/start", s.handleStart).Methods(http.MethodGet, http.MethodPost, http.MethodHead)
-	r.HandleFunc("/ping/{id:uuid}/{code:int}", s.handleExitCode).Methods(http.MethodGet, http.MethodPost, http.MethodHead)
+	methods := []string{http.MethodGet, http.MethodPost, http.MethodHead}
+
+	r.Route("/ping", func(ping *mux.Router) {
+		ping.HandleFunc("/{id:uuid}", s.handleSuccess).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/fail", s.handleFail).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/start", s.handleStart).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/{code:int}", s.handleExitCode).Methods(methods...)
+
+		// Named (slug) pings. The specific name/fail, name/start, and name/{code}
+		// routes are registered before the bare name route so those suffixes are
+		// not captured as part of a following slug segment.
+		ping.HandleFunc("/{id:uuid}/{name:slug}/fail", s.handleFail).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/{name:slug}/start", s.handleStart).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/{name:slug}/{code:int}", s.handleExitCode).Methods(methods...)
+		ping.HandleFunc("/{id:uuid}/{name:slug}", s.handleSuccess).Methods(methods...)
+	})
 
 	return r, nil
 }
@@ -248,6 +263,13 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request, event string, ex
 		return
 	}
 
+	name, named := mux.VarGet(r, "name")
+	if named && !check.AllowsName(name) {
+		s.log.Warn("ping for disallowed name", "check", id, "name", name)
+		writeText(w, http.StatusOK, bodyNotFound)
+		return
+	}
+
 	pingKey := fmt.Sprintf("ping:%s", id)
 	if !s.pingLimiter.Allow(pingKey, s.pingRPM) {
 		s.log.Warn("ping rate limit exceeded", "bucket", pingKey)
@@ -258,7 +280,7 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request, event string, ex
 	err := s.pusher.Push(r.Context(), metrics.Event{
 		Check:     id,
 		Event:     event,
-		Labels:    labelsWithRID(check.Labels, query.RID),
+		Labels:    eventLabels(check.Labels, query.RID, name),
 		ExitCode:  exitCode,
 		Timestamp: s.now(),
 	})
@@ -269,16 +291,24 @@ func (s *Server) record(w http.ResponseWriter, r *http.Request, event string, ex
 	writeText(w, http.StatusOK, bodyOK)
 }
 
-// labelsWithRID returns base unchanged when rid is empty, otherwise a copy with
-// the rid label added so the configured label map is never mutated.
-func labelsWithRID(base map[string]string, rid string) map[string]string {
-	if rid == "" {
+// eventLabels returns base with the rid and name labels added when they are set.
+// base is returned unchanged when neither applies, so the configured label map is
+// never mutated.
+func eventLabels(base map[string]string, rid, name string) map[string]string {
+	if rid == "" && name == "" {
 		return base
 	}
 
-	merged := make(map[string]string, len(base)+1)
+	merged := make(map[string]string, len(base)+2)
 	maps.Copy(merged, base)
-	merged[ridLabel] = rid
+
+	if rid != "" {
+		merged[ridLabel] = rid
+	}
+
+	if name != "" {
+		merged[nameLabel] = name
+	}
 
 	return merged
 }

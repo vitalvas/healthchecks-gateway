@@ -169,3 +169,24 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckAllowsName(t *testing.T) {
+	tests := []struct {
+		name  string
+		names *[]string
+		input string
+		want  bool
+	}{
+		{name: "nil rejects", names: nil, input: "backup", want: false},
+		{name: "empty allows any", names: &[]string{}, input: "backup", want: true},
+		{name: "listed allowed", names: &[]string{"backup", "sync"}, input: "sync", want: true},
+		{name: "unlisted rejected", names: &[]string{"backup"}, input: "sync", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			check := Check{Names: tt.names}
+			assert.Equal(t, tt.want, check.AllowsName(tt.input))
+		})
+	}
+}
