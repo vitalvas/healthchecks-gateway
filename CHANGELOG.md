@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/vitalvas/healthchecks-gateway/compare/v0.2.0...v0.2.1) (2026-10-05)
+
+
+### Bug Fixes
+
+* allow empty config by defaulting all fields ([05d6a06](https://github.com/vitalvas/healthchecks-gateway/commit/05d6a064edb6a4a6cb0e2394fd98696d06e8c9c5))
+
 ## [0.2.0](https://github.com/vitalvas/healthchecks-gateway/compare/v0.1.0...v0.2.0) (2026-10-05)
 
 
