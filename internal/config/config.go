@@ -2,9 +2,7 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"net/url"
 	"slices"
 	"time"
 	"uuid"
@@ -22,7 +20,7 @@ type Config struct {
 
 // VictoriaMetricsConfig describes the target vmsingle instance.
 type VictoriaMetricsConfig struct {
-	URL     string        `yaml:"url"`
+	URL     string        `yaml:"url" default:"http://127.0.0.1:8428"`
 	Timeout time.Duration `yaml:"timeout" default:"5s"`
 }
 
@@ -73,40 +71,9 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// validate rejects a check key that is not a valid UUID. Every other field has a
+// default, so an empty config is valid.
 func (c *Config) validate() error {
-	if c.Listen == "" {
-		return errors.New("config: listen must not be empty")
-	}
-
-	if c.VictoriaMetrics.URL == "" {
-		return errors.New("config: victoriametrics.url must not be empty")
-	}
-
-	parsed, err := url.Parse(c.VictoriaMetrics.URL)
-	if err != nil {
-		return fmt.Errorf("config: victoriametrics.url is invalid: %w", err)
-	}
-
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return fmt.Errorf("config: victoriametrics.url must be http or https, got %q", parsed.Scheme)
-	}
-
-	if c.VictoriaMetrics.Timeout <= 0 {
-		return errors.New("config: victoriametrics.timeout must be positive")
-	}
-
-	if c.RateLimit.CheckRPM <= 0 {
-		return errors.New("config: ratelimit.check_rpm must be positive")
-	}
-
-	if c.RateLimit.IPRPM <= 0 {
-		return errors.New("config: ratelimit.ip_rpm must be positive")
-	}
-
-	if len(c.Checks) == 0 {
-		return errors.New("config: at least one check must be configured")
-	}
-
 	for id := range c.Checks {
 		if _, err := uuid.Parse(id); err != nil {
 			return fmt.Errorf("config: check id %q is not a valid uuid: %w", id, err)

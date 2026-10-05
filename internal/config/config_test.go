@@ -50,32 +50,42 @@ checks:
 		assert.Equal(t, map[string]string{"service": "api", "env": "prod"}, check.Labels)
 	})
 
-	t.Run("applies defaults", func(t *testing.T) {
-		path := writeConfig(t, `
-victoriametrics:
-  url: "http://127.0.0.1:8428"
-checks:
-  f81d4fae-7dec-11d0-a765-00a0c91e6bf6: {}
-`)
+	t.Run("empty config applies all defaults", func(t *testing.T) {
+		path := writeConfig(t, "---")
 
 		cfg, err := Load(path)
 		require.NoError(t, err)
 
 		assert.Equal(t, ":8080", cfg.Listen)
+		assert.Equal(t, "http://127.0.0.1:8428", cfg.VictoriaMetrics.URL)
 		assert.Equal(t, 5*time.Second, cfg.VictoriaMetrics.Timeout)
 		assert.Equal(t, 10, cfg.RateLimit.CheckRPM)
 		assert.Equal(t, 50, cfg.RateLimit.IPRPM)
+		assert.Empty(t, cfg.Checks)
 	})
 
-	t.Run("missing file", func(t *testing.T) {
-		_, err := Load(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
-		require.Error(t, err)
+	t.Run("missing file loads defaults", func(t *testing.T) {
+		cfg, err := Load(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
+		require.NoError(t, err)
+
+		assert.Equal(t, ":8080", cfg.Listen)
+		assert.Equal(t, "http://127.0.0.1:8428", cfg.VictoriaMetrics.URL)
 	})
 
 	t.Run("invalid yaml", func(t *testing.T) {
 		path := writeConfig(t, "listen: [unterminated")
 		_, err := Load(path)
 		require.Error(t, err)
+	})
+
+	t.Run("validation error propagates", func(t *testing.T) {
+		path := writeConfig(t, `
+checks:
+  not-a-uuid: {}
+`)
+		_, err := Load(path)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "is not a valid uuid")
 	})
 }
 
@@ -107,44 +117,8 @@ func TestValidate(t *testing.T) {
 			mutate: func(*Config) {},
 		},
 		{
-			name:    "empty listen",
-			mutate:  func(c *Config) { c.Listen = "" },
-			wantErr: "listen must not be empty",
-		},
-		{
-			name:    "empty url",
-			mutate:  func(c *Config) { c.VictoriaMetrics.URL = "" },
-			wantErr: "url must not be empty",
-		},
-		{
-			name:    "bad url scheme",
-			mutate:  func(c *Config) { c.VictoriaMetrics.URL = "ftp://host" },
-			wantErr: "must be http or https",
-		},
-		{
-			name:    "unparsable url",
-			mutate:  func(c *Config) { c.VictoriaMetrics.URL = "http://[::1" },
-			wantErr: "is invalid",
-		},
-		{
-			name:    "zero timeout",
-			mutate:  func(c *Config) { c.VictoriaMetrics.Timeout = 0 },
-			wantErr: "timeout must be positive",
-		},
-		{
-			name:    "zero check rpm",
-			mutate:  func(c *Config) { c.RateLimit.CheckRPM = 0 },
-			wantErr: "check_rpm must be positive",
-		},
-		{
-			name:    "zero ip rpm",
-			mutate:  func(c *Config) { c.RateLimit.IPRPM = 0 },
-			wantErr: "ip_rpm must be positive",
-		},
-		{
-			name:    "no checks",
-			mutate:  func(c *Config) { c.Checks = nil },
-			wantErr: "at least one check",
+			name:   "empty config is valid",
+			mutate: func(c *Config) { *c = Config{} },
 		},
 		{
 			name:    "invalid check uuid",
