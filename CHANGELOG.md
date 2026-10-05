@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/vitalvas/healthchecks-gateway/compare/v0.2.1...v0.2.2) (2026-10-05)
+
+
+### Bug Fixes
+
+* set metric value to ping time in unix seconds ([15afae1](https://github.com/vitalvas/healthchecks-gateway/commit/15afae1345c9c16afc173a1d10bedab5fee08b77))
+
 ## [0.2.1](https://github.com/vitalvas/healthchecks-gateway/compare/v0.2.0...v0.2.1) (2026-10-05)
 
 
