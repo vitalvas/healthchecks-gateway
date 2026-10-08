@@ -1,12 +1,12 @@
 package app
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
@@ -36,11 +36,14 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("config load failure propagates", func(t *testing.T) {
-		err := Run([]string{"--config", filepath.Join(t.TempDir(), "missing.yaml")}, "test")
+		path := filepath.Join(t.TempDir(), "bad.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("listen: [unterminated"), 0o600))
+
+		err := Run([]string{"--config", path}, "test")
 		require.Error(t, err)
 	})
 
-	t.Run("valid config serves until signaled", func(t *testing.T) {
+	t.Run("valid config serves until context is cancelled", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.yaml")
 		content := `listen: "127.0.0.1:0"
 victoriametrics:
@@ -50,20 +53,30 @@ checks:
 `
 		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
 
+		ctx, cancel := context.WithCancel(context.Background())
+
 		done := make(chan error, 1)
 		go func() {
-			done <- Run([]string{"--config", path}, "test")
+			done <- run(ctx, path, discardLogger())
 		}()
 
 		time.Sleep(50 * time.Millisecond)
-		require.NoError(t, syscall.Kill(syscall.Getpid(), syscall.SIGTERM))
+		cancel()
 
 		select {
 		case err := <-done:
 			assert.NoError(t, err)
 		case <-time.After(3 * time.Second):
-			t.Fatal("Run did not shut down in time")
+			t.Fatal("run did not shut down in time")
 		}
+	})
+
+	t.Run("run propagates config load failure", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "bad.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("checks:\n  not-a-uuid: {}\n"), 0o600))
+
+		err := run(context.Background(), path, discardLogger())
+		require.Error(t, err)
 	})
 }
 
@@ -74,13 +87,15 @@ func TestServeGracefulShutdown(t *testing.T) {
 		ReadHeaderTimeout: time.Second,
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(httpServer, discardLogger())
+		done <- serve(ctx, httpServer, discardLogger())
 	}()
 
 	time.Sleep(50 * time.Millisecond)
-	require.NoError(t, syscall.Kill(syscall.Getpid(), syscall.SIGTERM))
+	cancel()
 
 	select {
 	case err := <-done:
@@ -97,6 +112,6 @@ func TestServeListenError(t *testing.T) {
 		ReadHeaderTimeout: time.Second,
 	}
 
-	err := serve(httpServer, discardLogger())
+	err := serve(context.Background(), httpServer, discardLogger())
 	require.Error(t, err)
 }

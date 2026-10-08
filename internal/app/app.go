@@ -46,12 +46,22 @@ func Run(args []string, version string) error {
 		return nil
 	}
 
-	cfg, err := config.Load(opts.Config)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	return run(ctx, opts.Config, log)
+}
+
+// run loads the configuration, wires the server, and serves until ctx is
+// cancelled. It is separate from Run so tests can drive the full path with a
+// cancellable context instead of an OS signal.
+func run(ctx context.Context, configPath string, log *slog.Logger) error {
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		return err
 	}
-
-	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	pusher := metrics.NewClient(cfg.VictoriaMetrics.URL, cfg.VictoriaMetrics.Timeout)
 	srv := server.New(server.Config{
@@ -73,14 +83,12 @@ func Run(args []string, version string) error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	return serve(httpServer, log)
+	return serve(ctx, httpServer, log)
 }
 
-// serve starts the HTTP server and shuts it down gracefully on SIGINT/SIGTERM.
-func serve(httpServer *http.Server, log *slog.Logger) error {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
+// serve starts the HTTP server and shuts it down gracefully when ctx is
+// cancelled (in production, on SIGINT/SIGTERM).
+func serve(ctx context.Context, httpServer *http.Server, log *slog.Logger) error {
 	errCh := make(chan error, 1)
 
 	go func() {
