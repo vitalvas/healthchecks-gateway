@@ -125,10 +125,14 @@ func (s *Server) Handler() (http.Handler, error) {
 
 	r := mux.NewRouter()
 	// Order: resolve the real client IP, enforce the per-IP limit before routing
-	// (and thus before the check lookup), then cap the body size.
+	// (and thus before the check lookup), cap the body size, and mark every
+	// response uncacheable so a ping is never served from a cache.
 	r.Use(proxyHeaders)
 	r.Use(s.ipRateLimit)
 	r.Use(sizeLimit)
+	r.Use(muxhandlers.NoCacheMiddleware(r, muxhandlers.NoCacheConfig{
+		Preset: muxhandlers.NoCachePresetModern,
+	}))
 
 	methods := []string{http.MethodGet, http.MethodPost, http.MethodHead}
 

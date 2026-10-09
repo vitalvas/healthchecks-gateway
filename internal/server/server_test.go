@@ -175,6 +175,15 @@ func TestPingEvents(t *testing.T) {
 	}
 }
 
+func TestResponseDisablesCache(t *testing.T) {
+	pusher := &fakePusher{}
+	h := testHandler(t, pusher)
+
+	rec := do(t, h, http.MethodGet, pingURL(knownID, ""))
+
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
+}
+
 func TestHTTPMethods(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodHead} {
 		t.Run(method, func(t *testing.T) {
